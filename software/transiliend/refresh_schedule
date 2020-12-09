@@ -1,0 +1,15 @@
+#/bin/bash
+if [[ -f transilien.zip ]]; then
+	rm transilien.zip
+fi
+wget -O transilien.zip http://medias.sncf.com/sncfcom/open-data/gtfs/gtfs-lines-last.zip
+if [[ ! -e schedule ]]; then
+	mkdir schedule
+fi
+unzip -o transilien.zip -d schedule/
+if [[ -f transilien.zip ]]; then
+        rm transilien.zip
+fi
+mysql -u root --password="tqbfjotld" < db.sql
+
+
