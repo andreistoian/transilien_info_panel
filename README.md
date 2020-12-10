@@ -22,6 +22,8 @@ It is based on two parts that communicate through serial-over-USB:
 
 ![alt text](https://github.com/andreistoian/transilien_info_panel/blob/main/transilien_small.jpg?raw=true)
 
+[Large version](https://github.com/andreistoian/transilien_info_panel/blob/main/transilien.jpg?raw=true)
+
 ## Bill of Materials
 
 - 12 Capacitors
@@ -47,8 +49,8 @@ It is based on two parts that communicate through serial-over-USB:
 - 16 Miscellaneous
   - 1	J1	Simple Header through-hole (used for programming the PIC)
   - 1	J2	Through-hole USB connector
-  - 1	LED1	HDSP-B0XG		
-  - 1	LED2	GNQ-4041AX		
+  - 4	LED1	HDSP-B0XG		
+  - 5	LED2	GNQ-4041AX		
   - 2 panel mounted push buttons
   - 1 through-hole push button (for reset)
   - 1 panel mounted single pole switch		
@@ -58,6 +60,6 @@ It is based on two parts that communicate through serial-over-USB:
 ## Erratum
 
 - The USB connector is wired wrong (need to invert the two D- and D+ pins)
-- There are two missing connections on the diagram and the PCB, these can be fixed with small wires. 
+- There are two missing connections on the PCB (ISET connection to 1k resistor for two MAX7219 chips), these can be fixed with small wires. 
 
 
