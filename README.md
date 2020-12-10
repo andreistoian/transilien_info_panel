@@ -55,5 +55,9 @@ It is based on two parts that communicate through serial-over-USB:
   - 1	X1	CRYSTAL		8 MHz
 
 
+## Erratum
+
+- The USB connector is wired wrong (need to invert the two D- and D+ pins)
+- There are two missing connections on the diagram and the PCB, these can be fixed with small wires. 
 
 
