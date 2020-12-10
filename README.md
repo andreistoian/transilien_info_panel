@@ -56,6 +56,48 @@ It is based on two parts that communicate through serial-over-USB:
   - 1 panel mounted single pole switch		
   - 1	X1	CRYSTAL		8 MHz
 
+## Transilien timetable update service
+
+### Requirements:
+
+Install on a Raspberry PI with Raspbian:
+
+```
+sudo apt-get install mysql-server python-pip python-mysql.connector ntp
+sudo pip install pyserial
+```
+
+Setup the mysql server password for admin.
+
+Run 
+```
+./refresh_schedule
+```
+
+to initialize the database.
+
+### Setting up as a service
+
+Create `/etc/systemd/system/transiliend.service` and type in the following. Then `sudo systemctl start transiliend`
+```
+[Unit]
+Description=Transilien
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python -u /home/pi/transilien/software/transiliend/transiliend.py
+WorkingDirectory=/home/pi/transilien/software/transiliend/
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
+
+```
+
+You should also use cron to schedule running `./refresh_schedule` every month or so.
 
 ## Erratum
 
