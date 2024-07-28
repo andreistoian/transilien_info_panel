@@ -6,6 +6,7 @@ import time
 import threading
 import thread
 import urllib2
+import json
 import base64
 from math import floor
 import xml.etree.ElementTree as ET
@@ -16,35 +17,71 @@ import traceback
 import serial
 import serial.tools.list_ports
 
-from transilien_api import API_username, API_password
+API_username = ""
+API_password = ""
+
+IDFM_API_KEY = os.environ.get('IDFM_API_KEY', None)
+
+assert IDFM_API_KEY is not None 
 
 TT_DIR = 'tt/'
 
 REFRESH_PERIOD = 10
 
-ID_GARE_SAINT_DENIS = "87271015"
-ID_GARE_DU_NORD = "87271007"
-ID_GARE_EPINAY = "87271122"
-ID_GARE_SARCELLES = "87276196"
-
-ID_GARE_JUVISY = "87545244"
-ID_GARE_EVRY = "87681387"
-ID_GARE_AUSTERLITZ = "87547026"
-ID_GARE_LYON = "87686030"
-
-ID_GARE_LOZERE = "87758821"
-ID_GARE_MASSY = "87393579"
-
 MINS_ST_DENIS_NORD = 8
-MIN_TIME_TO_STATION = 10
+MIN_TIME_TO_STATION = 1
 
-ID_GARE_DEPART = ID_GARE_SAINT_DENIS;
-ID_GARE_INTERM = ID_GARE_DU_NORD;
-ID_GARE_FINAL = ID_GARE_LOZERE;
 
-NAME_GARE_DEPART = 'SAINT-DENIS'
-NAME_GARE_ITERM = 'PARIS NORD'
-NAME_GARE_FINAL = 'LOZERE'
+# ['MonitoredVehicleJourney']['DestinationRef']
+def make_stop(id):
+	return 'STIF:StopPoint:Q:' + id + ':'
+
+GARES_PARIS = { 
+	'C': [
+		'41251', # St Quentien
+		'41217', # Versailles Chateau
+		'473919', '473911', '473921', '473926', '473920', '412842', '473909', '473906', '473905', '473903',  #Pontoise
+		'41075', '472491', '470910', '411487', '471885', # Invalides
+		'471233', '471077', '471976', '472718', '472582', '472323', '472865', # Austerlitz
+	],
+	'D': [
+		'411439', #Gare de Creil'
+		'411420', #  Orry-la-Ville Coye la Foret
+		'472711', '470637', '472411', '411369', '471680', '472548', '470904', '411370', '471426', # Stade De France
+		'470983', '470949', '470954', '470903', '470898', '470891', '470890', '470759', '470752', 
+		'470737', '470689', '470683', '470664', '470646', '470864', '470869', '470877', '470842', 
+		'470846', '470809', '470812', '470799', '470762', '470774', '470773', '41396', # Gare de lyon
+		'470637', '470605', '472927', '472932', '472902', '472915', '472887', '472892', '472867', '472878',
+		'472845', '472848', '472828', '472837', '472982', '472997', '472940', '41251', '411475', '411500', '411451'
+		'411427', '420316', '41357', '41239', '41385', '41145', '41160', '41141', '41365', '41254',  # Gare du nord
+		'41097', '470760', '470629', '472930', '472908', '472918', '472882' # Villiers le bel
+	]
+}
+
+GARES_BANLIEUE = { 
+	'C': [
+		'41316', #"Gare de Saint-Martin d'Etampes", 
+		'41324', #"Gare de Dourdan" 
+		'471121', '471238', '471217', '471229', '471085', '471095', '471043', #Bretigny
+	], 
+	'D': [
+		'41336' #'Gare de Corbeil Essonnes'
+	] 
+}
+
+GARES_IGNORE = list(map(make_stop, [
+	'411484', # Malsherbes
+	'41361', #Melun
+]))
+
+GARES_LISTS = [
+	list(map(make_stop, GARES_PARIS['C'])), 
+	list(map(make_stop, GARES_PARIS['D'])),
+	list(map(make_stop, GARES_BANLIEUE['C'])), 
+	list(map(make_stop, GARES_BANLIEUE['D']))
+]
+
+NUM_LISTS = 4 #len(GARES_LISTS)
 
 NAME_GARE_JUVISY = "JUVISY"
 NAME_GARE_MASSY = "MASSY PALAISEAU"
@@ -52,21 +89,9 @@ NAME_GARE_EVRY = "EVRY COURCOURONNES - Centre"
 NAME_GARE_AUSTERLITZ = "PARIS AUSTERLITZ"
 NAME_GARE_LYON = "PARIS GARE DE LYON"
 
-#ID_GARE_DEST_PARIS = [ID_GARE_DU_NORD];
-#ID_GARE_DEST_BANLIEUE = [ID_GARE_EPINAY, ID_GARE_SARCELLES];
-
-ID_GARE_ROUTES_1 = [[ID_GARE_JUVISY, ID_GARE_MASSY], [ID_GARE_JUVISY, ID_GARE_EVRY], [ID_GARE_JUVISY, ID_GARE_AUSTERLITZ], [ID_GARE_JUVISY, ID_GARE_LYON]]
-
-NUM_LISTS = len(ID_GARE_ROUTES_1)
-
 NAME_GARE_ROUTES_1 = [[NAME_GARE_JUVISY, NAME_GARE_MASSY], [NAME_GARE_JUVISY, NAME_GARE_EVRY], [NAME_GARE_JUVISY, NAME_GARE_AUSTERLITZ], [NAME_GARE_JUVISY, NAME_GARE_LYON]]
 
 MISSION_FILTERS = [[]]*NUM_LISTS
-
-#ID_GARE_PARTS = [[ID_GARE_SAINT_DENIS, ID_GARE_INTERM], [ID_GARE_INTERM, ID_GARE_FINAL]]
-#NAME_GARE_PARTS = [[NAME_GARE_DEPART, NAME_GARE_ITERM], [NAME_GARE_ITERM, NAME_GARE_FINAL]]
-
-#ID_GARE_DEST_ALL = [ID_GARE_DEST_PARIS, [ID_GARE_INTERM, ID_GARE_FINAL]]
 
 #//TIMECODE: HHMM
 #//FORMAT: CURTIME:TIMECODE-{TRAINNAME:CHAR-ARRIVE:TIMECODE-STATUS:CHAR[01234RS]-VOIE:CHARx2}x4
@@ -214,8 +239,7 @@ def transilien_listen_thread():
 #					times_src = 0
 					internet_refresh_event.set()
 				elif ord(readBytes[1]) == 0xA0:
-					print("Cmd ok: " + bths(readBytes))
-					#print "Cmd ok: " + bths(readBytes)
+					#print("Cmd ok: " + bths(readBytes))
 					pass
 				else:
 					print("Error input: " + bths(readBytes))
@@ -316,6 +340,82 @@ def transilien_get_current_trains(nmax):
 			return []			
 					
 	return train_lists
+
+
+def datetime_from_utc_to_local(utc_datetime):
+    now_timestamp = time.time()
+    offset = datetime.fromtimestamp(now_timestamp) - datetime.utcfromtimestamp(now_timestamp)
+    return utc_datetime + offset
+
+def idfm_get_current_trains(maxtrains):
+
+	url = "https://prim.iledefrance-mobilites.fr/marketplace/stop-monitoring?MonitoringRef=STIF:StopPoint:Q:41309:"
+	req = urllib2.Request(url)
+
+	all_line_id = {'STIF:Line::C01727:' : 'C', 'STIF:Line::C01728:': 'D' }
+	arrival_statuses = { 'delayed': 'ret', 'onTime': 'T', 'cancelled': 'supp', 'early': 'T'}
+
+	req.add_header("apikey", IDFM_API_KEY)
+	req.add_header('Pragma', 'no-cache')
+	req.add_header('Cache-Control', 'no-cache')
+
+	the_page = None
+	try:
+		response = urllib2.urlopen(req)
+		the_page = response.read()
+	except IOError as err:
+		print("Transilien API GET error")
+
+	data = json.loads(the_page)
+
+	train_list = [[] for _ in range(NUM_LISTS)]
+	trains_data = data['Siri']['ServiceDelivery']['StopMonitoringDelivery'][0]['MonitoredStopVisit']
+	for record in trains_data:
+
+		try:
+			line_id = record['MonitoredVehicleJourney']['LineRef']['value']
+			arrival_status = record['MonitoredVehicleJourney']['MonitoredCall']['ArrivalStatus']
+		except Exception as err:
+			print("API returned format error: \n\n" + str(err) + "\n\n" + str(record))
+
+		try:
+			str_departure_time = record['MonitoredVehicleJourney']['MonitoredCall']['ExpectedDepartureTime']
+			dest_ref = record['MonitoredVehicleJourney']['DestinationRef']['value'].decode('utf-8')
+			dest_name = record['MonitoredVehicleJourney']['DestinationName'][0]['value'].decode('utf-8')
+		except:
+			# No departure = train is at end of the line
+			continue
+
+		idx_list_record = -1
+		for idx_list, dest_list in enumerate(GARES_LISTS):
+			if dest_ref in dest_list:
+				idx_list_record = idx_list
+				break
+
+		if dest_ref in GARES_IGNORE:
+			continue
+
+		if idx_list_record == -1:
+			print("Unknown train found: " + str(record))
+			continue
+
+		if idx_list_record >= len(train_list):
+			print("ERROR Trying to insert to train list " + str(idx_list_record))
+			continue
+
+		train_info = {}
+		train_info['id'] = all_line_id.get(line_id, '-')
+		train_info['miss'] = 0
+		train_info['time'] = datetime_from_utc_to_local(datetime.strptime(str_departure_time[0:-5], '%Y-%m-%dT%H:%M:%S'))
+		train_info['mode'] = 0
+		train_info['num'] = 0 #str_departure_time
+		train_info['dest_name'] = dest_name
+		train_info['etat'] = arrival_statuses.get(arrival_status, 'supp')
+		train_info['corresp'] = 0
+
+		train_list[idx_list_record].append(train_info)
+
+	return train_list
 
 def merge_combined_train_lists(c_list_1, c_list_2, display_datetime):
 	train_list = c_list_1 + c_list_2
@@ -522,7 +622,7 @@ def internet_times_thread_func():
 	while True:
 		internet_refresh_event.wait(timeout=UPDATE_SLEEP)	
 		start_dest_id = destination_id
-		train_lists_new = transilien_get_current_trains(4)
+		train_lists_new = idfm_get_current_trains(4)
 		with train_list_lock: 
 			rt_train_list_time = datetime.now()
 #			print "set train list time to : " + str(train_list_time)
@@ -609,7 +709,7 @@ def get_and_cache_tt_two_stations(cur_date, station1, station2):
 #--- main program ----
 		
 internet_thread = thread.start_new_thread(internet_times_thread_func, tuple([]))		
-db_thread = thread.start_new_thread(db_times_thread_func, tuple([]))
+#db_thread = thread.start_new_thread(db_times_thread_func, tuple([]))
 
 while True:
 	if device == None:
