@@ -26,7 +26,7 @@ assert IDFM_API_KEY is not None
 
 TT_DIR = 'tt/'
 
-REFRESH_PERIOD = 10
+REFRESH_PERIOD = 100
 
 MINS_ST_DENIS_NORD = 8
 MIN_TIME_TO_STATION = 1
@@ -60,9 +60,9 @@ GARES_PARIS = {
 
 GARES_BANLIEUE = { 
 	'C': [
-		'41316', #"Gare de Saint-Martin d'Etampes", 
-		'41324', #"Gare de Dourdan" 
-		'471121', '471238', '471217', '471229', '471085', '471095', '471043', #Bretigny
+#		'41316', #"Gare de Saint-Martin d'Etampes", 
+#		'41324', #"Gare de Dourdan" 
+#		'471121', '471238', '471217', '471229', '471085', '471095', '471043', #Bretigny
 	], 
 	'D': [
 		'41336' #'Gare de Corbeil Essonnes'
@@ -72,6 +72,11 @@ GARES_BANLIEUE = {
 GARES_IGNORE = list(map(make_stop, [
 	'411484', # Malsherbes
 	'41361', #Melun
+	# Remove C -> Only D allowed
+	'41316', #"Gare de Saint-Martin d'Etampes", 
+	'41324', #"Gare de Dourdan" 
+	'471121', '471238', '471217', '471229', '471085', '471095', '471043', #Bretigny
+
 ]))
 
 GARES_LISTS = [
@@ -359,16 +364,23 @@ def idfm_get_current_trains(maxtrains):
 	req.add_header('Pragma', 'no-cache')
 	req.add_header('Cache-Control', 'no-cache')
 
+	train_list = [[] for _ in range(NUM_LISTS)]
+
 	the_page = None
 	try:
 		response = urllib2.urlopen(req)
 		the_page = response.read()
 	except IOError as err:
-		print("Transilien API GET error")
+		print("IDFM API GET error")
+		traceback.print_exc()		
+		return train_list
 
-	data = json.loads(the_page)
+	try:
+		data = json.loads(the_page)
+	except:
+		print("IDFM API Decode JSON ERROR")
+		return train_list
 
-	train_list = [[] for _ in range(NUM_LISTS)]
 	trains_data = data['Siri']['ServiceDelivery']['StopMonitoringDelivery'][0]['MonitoredStopVisit']
 	for record in trains_data:
 
